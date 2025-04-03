@@ -3,6 +3,8 @@ from wordcloud import WordCloud
 import pandas as pd
 from collections import Counter
 import emoji
+import torch
+from transformers import pipeline
 
 extract = URLExtract()
 
@@ -133,3 +135,42 @@ def activity_map(selected_user, df):
 
     user_heatmap = df.pivot_table(index='day_name', columns='period', values='message', aggfunc='count').fillna(0)
     return user_heatmap
+
+
+# Load sentiment analysis model using Transformers
+sentiment_analyzer = pipeline("sentiment-analysis", model="nlptown/bert-base-multilingual-uncased-sentiment")
+
+# Load emotion detection model using Transformers (optional)
+emotion_analyzer = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
+
+
+def analyze_message(message):
+    # Analyze sentiment
+    sentiment_result = sentiment_analyzer(message)[0]
+    sentiment = sentiment_result['label']
+    sentiment_score = sentiment_result['score']
+
+    # Analyze emotion (optional)
+    emotion_result = emotion_analyzer(message)[0]
+    emotion = emotion_result['label']
+    emotion_score = emotion_result['score']
+
+    # Classify tone based on sentiment and emotion
+    if sentiment in ['1 star', '2 stars']:
+        tone = 'Serious'
+    elif emotion in ['anger', 'fear']:
+        tone = 'Haunted'
+    elif sentiment in ['4 stars', '5 stars']:
+        tone = 'Friendly'
+    else:
+        tone = 'Casual'
+
+    # Return analysis result
+    return {
+        'message': message,
+        'sentiment': sentiment,
+        'sentiment_score': sentiment_score,
+        'emotion': emotion,
+        'emotion_score': emotion_score,
+        'tone': tone
+    }

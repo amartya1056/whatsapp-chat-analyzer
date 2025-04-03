@@ -2,6 +2,12 @@ import streamlit as st
 import preprocessor, helper
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
+import pandas as pd
+from helper import analyze_message  # Importing the new analysis function
+
+# Get port from environment variable (Render assigns it dynamically)
+port = int(os.environ.get("PORT", 8501))
 
 st.sidebar.title("Whatsapp Chat Analyzer")
 
@@ -11,7 +17,7 @@ if uploaded_file is not None:
     data = bytes_data.decode("utf-8")
     df = preprocessor.preprocess(data)
 
-    #fetch unique users
+    # fetch unique users
     user_list = df['user'].unique().tolist()
     user_list.remove('group_notification')
     user_list.sort()
@@ -20,11 +26,9 @@ if uploaded_file is not None:
     selected_user = st.sidebar.selectbox("Show Analysis wrt", user_list)
 
     if st.sidebar.button("Show Analysis"):
-
         num_messages, words, num_media_messages, num_links = helper.fetch_stats(selected_user, df)
 
         st.title("Top Statistics")
-
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
@@ -75,15 +79,11 @@ if uploaded_file is not None:
             plt.xticks(rotation='vertical')
             st.pyplot(fig)
 
-        st.title(" Weekly Activity Map")
+        st.title("Weekly Activity Map")
         user_heatmap = helper.activity_map(selected_user, df)
         fig, ax = plt.subplots()
-        ax = sns.heatmap(user_heatmap)
+        sns.heatmap(user_heatmap, ax=ax)
         st.pyplot(fig)
-
-
-
-
 
         # Finding the busiest users in the group (Group Level)
         if selected_user == 'Overall':
@@ -94,7 +94,7 @@ if uploaded_file is not None:
 
             with col1:
                 ax.bar(x.index, x.values, color='blue')
-                plt.xticks(rotation= 'vertical')
+                plt.xticks(rotation='vertical')
                 st.pyplot(fig)
             with col2:
                 st.dataframe(new_df)
@@ -102,18 +102,15 @@ if uploaded_file is not None:
         # Word Cloud
         st.title("Wordcloud")
         df_wc = helper.create_word_cloud(selected_user, df)
-        fig,ax = plt.subplots()
+        fig, ax = plt.subplots()
         ax.imshow(df_wc)
         st.pyplot(fig)
 
         # Most common words
         most_common_df = helper.most_common_words(selected_user, df)
-
-        fig,ax = plt.subplots()
-
+        fig, ax = plt.subplots()
         ax.barh(most_common_df[0], most_common_df[1])
-        plt.xticks(rotation= 'vertical')
-
+        plt.xticks(rotation='vertical')
         st.title("Most Common Words")
         st.pyplot(fig)
 
@@ -125,8 +122,25 @@ if uploaded_file is not None:
         with col1:
             st.dataframe(emoji_df)
         with col2:
-            fig,ax = plt.subplots()
+            fig, ax = plt.subplots()
             ax.pie(emoji_df[1].head(), labels=emoji_df[0].head(), autopct="%0.2f")
             st.pyplot(fig)
 
+        # Tone and Sentiment Analysis
+        st.title("Tone and Sentiment Analysis")
 
+        analysis_results = []
+        for message in df['message']:
+            analysis_results.append(analyze_message(message))
+
+        analysis_df = pd.DataFrame(analysis_results)
+
+        st.write("Sentiment and Tone Analysis Report")
+        st.dataframe(analysis_df)
+
+        st.download_button(
+            label="Download Analysis Report",
+            data=analysis_df.to_csv().encode('utf-8'),
+            file_name='tone_sentiment_analysis.csv',
+            mime='text/csv'
+        )
